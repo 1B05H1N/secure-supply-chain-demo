@@ -1,4 +1,4 @@
-# Secure supply-chain demo
+# Secure Supply-Chain Demo
 
 A small Python package built into a byte-for-byte reproducible archive with an
 SPDX 2.3 file inventory. The release workflow signs build provenance and the
@@ -9,7 +9,7 @@ This is the implementation for the
 [software release case study](https://github.com/1B05H1N/security-architecture-case-studies/blob/main/cases/software-release.md).
 It uses only Python's standard library. Use Python 3.11 or newer.
 
-## Run locally
+## Quick Start
 
 ```sh
 python3 -m unittest -v
@@ -20,7 +20,7 @@ python3 supply_chain.py verify dist/greeter-1.0.0.tar.gz dist/greeter-1.0.0.spdx
 Building twice with the same source, version, `SOURCE_DATE_EPOCH`, and Python
 version produces identical archive and SBOM bytes. CI checks this on every push.
 
-## What the verifier rejects
+## What the Verifier Rejects
 
 The verifier reads the archive in memory and never writes its entries to disk.
 It fails on:
@@ -37,7 +37,7 @@ Matching the SBOM proves only that the archive and inventory agree. Anyone who
 can replace the archive can also replace an unsigned SBOM, so a local check is
 not evidence of who built the release.
 
-## Release flow
+## Release Flow
 
 Pushing a tag such as `v1.0.0` runs [release.yml](.github/workflows/release.yml):
 
@@ -51,7 +51,7 @@ Pushing a tag such as `v1.0.0` runs [release.yml](.github/workflows/release.yml)
 Every action is pinned to a full commit SHA. Pull-request CI has read-only
 permissions and cannot sign or publish.
 
-## Verify a release as a consumer
+## Verify a Release as a Consumer
 
 ```sh
 gh release download v1.0.0 --repo 1B05H1N/secure-supply-chain-demo
@@ -84,4 +84,8 @@ release announcement, rather than values copied from the downloaded files.
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Author
+
+**1B05H1N** - [GitHub Profile](https://github.com/1B05H1N)
