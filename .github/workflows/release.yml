@@ -1,0 +1,79 @@
+name: Release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions: {}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: python -m unittest -v
+      - name: Build
+        id: build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          python supply_chain.py build --version "$version" --output dist
+          python supply_chain.py verify "dist/greeter-$version.tar.gz" "dist/greeter-$version.spdx.json"
+          echo "archive=dist/greeter-$version.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "sbom=dist/greeter-$version.spdx.json" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.build.outputs.archive }}
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ steps.build.outputs.archive }}
+          sbom-path: ${{ steps.build.outputs.sbom }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: read
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist
+      - name: Verify provenance and SBOM before release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="dist/greeter-${GITHUB_REF_NAME#v}.tar.gz"
+          common=(
+            --repo "$GITHUB_REPOSITORY"
+            --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml"
+            --source-ref "$GITHUB_REF"
+            --source-digest "$GITHUB_SHA"
+            --deny-self-hosted-runners
+          )
+          gh attestation verify "$archive" "${common[@]}"
+          gh attestation verify "$archive" "${common[@]}" --predicate-type https://spdx.dev/Document/v2.3
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Verify before use: see the README section on consumer verification."
